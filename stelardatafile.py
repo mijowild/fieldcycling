@@ -14,11 +14,16 @@ class StelarDataFile:
     def adddata(self, ie, parameter, data):
         self.datas[ie]=(parameter,data)
         
+    def getexp(self,ie):
+        return self.datas[ie]
     def getparameter(self,ie):
         parameter, data =self.datas[ie]
         return parameter
-    def getexp(self,ie):
-        return self.datas[ie]
+    def getdata(self,ie):
+        parameter, data = self.datas[ie]
+        return data
+
+
 
     def sdfimport(self):
         ie=1
