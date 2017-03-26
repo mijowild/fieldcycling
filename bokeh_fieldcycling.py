@@ -7,10 +7,13 @@ import re
 import stelardatafile as sdf
 from bokeh.charts import Scatter, output_file, show
 from bokeh.sampledata.autompg import autompg as df
-
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.io import output_file, show
 from bokeh.plotting import figure
+from bokeh.layouts import widgetbox
+from bokeh.models.widgets import Dropdown
+
+
 
 
 polymer=sdf.StelarDataFile('297K.sdf',r'.\data')
@@ -54,8 +57,11 @@ p2 = figure(plot_width=300, plot_height=300)
 p2.circle_cross(x=np.array(df.tau), y=np.array(df.phi), color="navy")
 tab2 = Panel(child=p2, title="exp decay")
 
+menu = [("Experiment {:4d}".format(i), "{:4d}".format(i)) for i in range(polymer.get_number_of_experiments())]
+dropdown = Dropdown(label="Dropdown button", button_type="warning", menu=menu)
+tab3 = Panel(child=widgetbox(dropdown), title='choose experiment nr')
+# TODO: in order to use the selected experiment number we have to figure out how call backs work.
+
 output_file("slider.html")
-
-tabs = Tabs(tabs=[ tab1, tab2 ])
-
+tabs = Tabs(tabs=[ tab1, tab2, tab3 ])
 show(tabs)

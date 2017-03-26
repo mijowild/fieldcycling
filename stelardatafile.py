@@ -16,14 +16,17 @@ class StelarDataFile:
         
     def getexp(self,ie):
         return self.datas[ie]
+
     def getparameter(self,ie):
         parameter, data =self.datas[ie]
         return parameter
+
     def getdata(self,ie):
         parameter, data = self.datas[ie]
         return data
 
-
+    def get_number_of_experiments(self):
+        return len(self.datas)
 
     def sdfimport(self):
         ie=1
