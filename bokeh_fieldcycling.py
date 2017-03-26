@@ -19,7 +19,8 @@ from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
 import stelardatafile as sdf
 
-polymer=sdf.StelarDataFile('297K.sdf',r'.\data')
+path=os.path.join(os.path.curdir,'data')
+polymer=sdf.StelarDataFile('297K.sdf',path)
 polymer.sdfimport()
 nr_experiments = polymer.get_number_of_experiments()
 
@@ -41,7 +42,7 @@ def modify_doc(doc):
         dw=1
     temperature=parameters['TEMP']
     fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*                 nblk), columns=['real', 'im'])/ns
-    fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
+    fid['magnitude']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
 
     tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #as a dummy
     startpoint=int(0.05*bs)-1
@@ -50,7 +51,7 @@ def modify_doc(doc):
     for blk in range(nblk):
         start=startpoint + blk * bs
         end=endpoint + blk * bs
-        phi[blk]=fid['abso'].iloc[start:end].sum() / (endpoint-startpoint)
+        phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
     df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
 
     p1 = figure(plot_width=300, plot_height=300)
@@ -75,7 +76,7 @@ def modify_doc(doc):
             dw=1
         temperature=parameters['TEMP']
         fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*                 nblk), columns=['real', 'im'])/ns
-        fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
+        fid['magnitude']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
 
         tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #as a dummy
         startpoint=int(0.05*bs)-1

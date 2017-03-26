@@ -40,7 +40,7 @@ class StelarDataFile:
             while 'DATA' not in words[0]:
                 words = fid.readline().split('\t')
                 if not words[0]: #probably eof reached
-                    print('escape')
+                    print('probably end of file reached')
                     break #escape the while loop
                 #read the parameters of file
                 if len(words)==2:

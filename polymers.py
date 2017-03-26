@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import re
 import stelardatafile as sdf
 
-polymer=sdf.StelarDataFile('297K.sdf',r'.\data')
+path=os.path.join(os.path.curdir,'data')
+polymer=sdf.StelarDataFile('297K.sdf',path)
 polymer.sdfimport()
 
 ### preprocessing of the data experiment number ie=1
