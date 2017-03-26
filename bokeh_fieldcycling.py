@@ -39,7 +39,8 @@ def modify_doc(doc):
     except:
         dw=1
     temperature=parameters['TEMP']
-    fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*                 nblk), columns=['real', 'im'])/ns
+    fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*nblk),
+                     columns=['real', 'im'])/ns
     fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5 
     tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #as a dummy
     startpoint=int(0.05*bs)-1
@@ -51,13 +52,18 @@ def modify_doc(doc):
         phi[blk]=fid['abso'].iloc[start:end].sum() / (endpoint-startpoint)
     df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
 
+    source_fid = ColumnDataSource(data=ColumnDataSource.from_df(fid))
+    source_df = ColumnDataSource(data=ColumnDataSource.from_df(df))
+
+    
     p1 = figure(plot_width=300, plot_height=300)
-    p1.multi_line(xs=[fid.index, fid.index, fid.index],
-                  ys=[fid.im, fid.real, fid.abso],
-                  color=['blue', 'green', 'red'])
+    p1.line('index', 'im', source=source_fid, color='blue')
+    p1.line('index', 'real', source=source_fid, color='green')
+    p1.line('index', 'abso', source=source_fid, color='red')
+
 
     p2 = figure(plot_width=300, plot_height=300)
-    p2.circle_cross(x=np.array(df.tau), y=np.array(df.phi), color="navy")
+    p2.circle_cross('tau', 'phi', source=source_df, color="navy")
     
     slider = Slider(start=1, end=nr_experiments, value=1, step=1)
 
@@ -77,16 +83,21 @@ def modify_doc(doc):
         temperature=parameters['TEMP']
         fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*                 nblk), columns=['real', 'im'])/ns
         fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5
-        print (ie, parameters)
+        
+        
         tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #as a dummy
         startpoint=int(0.05*bs)-1
         endpoint=int(0.1*bs)
-        phi=np.zeros(nblk)
+        phi=np.zeros(nblk)  
         for blk in range(nblk):
             start=startpoint + blk * bs
             end=endpoint + blk * bs
             phi[blk]=fid['abso'].iloc[start:end].sum() / (endpoint-startpoint)
         df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
+
+        source_fid.data = ColumnDataSource.from_df(fid)
+        source_df.data = ColumnDataSource.from_df(df)
+
     slider.on_change('value', callback)
     doc.add_root(column(slider, p1, p2))
 
