@@ -24,10 +24,9 @@ polymer.sdfimport()
 nr_experiments = polymer.get_number_of_experiments()
 
 io_loop = IOLoop.current()
+ie = 1
 
 def modify_doc(doc):
-    slider = Slider(start=1, end=nr_experiments, value=1, step=1)
-    ie = 1
     parameters=polymer.getparameter(ie)
     bs=int(parameters['BS'])
     try:
@@ -41,8 +40,7 @@ def modify_doc(doc):
         dw=1
     temperature=parameters['TEMP']
     fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*                 nblk), columns=['real', 'im'])/ns
-    fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
-
+    fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5 
     tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #as a dummy
     startpoint=int(0.05*bs)-1
     endpoint=int(0.1*bs)
@@ -59,6 +57,9 @@ def modify_doc(doc):
                   color=['blue', 'green', 'red'])
 
     p2 = figure(plot_width=300, plot_height=300)
+    p2.circle_cross(x=np.array(df.tau), y=np.array(df.phi), color="navy")
+    
+    slider = Slider(start=1, end=nr_experiments, value=1, step=1)
 
     def callback(attr, old, new):
         ie = new
@@ -75,8 +76,8 @@ def modify_doc(doc):
             dw=1
         temperature=parameters['TEMP']
         fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*                 nblk), columns=['real', 'im'])/ns
-        fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
-
+        fid['abso']=( fid['real']**2 + fid['im']**2 )**0.5
+        print (ie, parameters)
         tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #as a dummy
         startpoint=int(0.05*bs)-1
         endpoint=int(0.1*bs)
@@ -86,14 +87,6 @@ def modify_doc(doc):
             end=endpoint + blk * bs
             phi[blk]=fid['abso'].iloc[start:end].sum() / (endpoint-startpoint)
         df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
-
-        p1 = figure(plot_width=300, plot_height=300)
-        p1.multi_line(xs=[fid.index, fid.index, fid.index],
-                      ys=[fid.im, fid.real, fid.abso],
-                      color=['blue', 'green', 'red'])
-
-        p2 = figure(plot_width=300, plot_height=300)
-        p2.circle_cross(x=np.array(df.tau), y=np.array(df.phi), color="navy")
     slider.on_change('value', callback)
     doc.add_root(column(slider, p1, p2))
 
