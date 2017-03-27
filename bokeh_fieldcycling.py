@@ -66,9 +66,12 @@ def modify_doc(doc):
     p2.circle_cross('tau', 'phi', source=source_df, color="navy")
     
     slider = Slider(start=1, end=nr_experiments, value=1, step=1)
+    
+    menu = [("Experiment nr {:4d}".format(ie), "{:4d}".format(ie)) for ie in range(1, nr_experiments+1)]
+    dropdown = Dropdown(label="choose experiment number", menu=menu)    
 
     def callback(attr, old, new):
-        ie = new
+        ie = int(new)
         parameters=polymer.getparameter(ie)
         bs=int(parameters['BS'])
         try:
@@ -96,8 +99,8 @@ def modify_doc(doc):
         source_fid.data = ColumnDataSource.from_df(fid)
         source_df.data = ColumnDataSource.from_df(df)
 
-    slider.on_change('value', callback)
-    doc.add_root(column(slider, p1, p2))
+    dropdown.on_change('value', callback)
+    doc.add_root(column(dropdown, p1, p2))
 
 bokeh_app = Application(FunctionHandler(modify_doc))
 
