@@ -66,9 +66,7 @@ def modify_doc(doc):
 
     p2 = figure(plot_width=300, plot_height=300)
     p2.circle_cross('tau', 'phi', source=source_df, color="navy")
-    
-    slider = Slider(start=1, end=nr_experiments, value=1, step=1)
-    
+        
     menu = [("Experiment nr {:4d}".format(ie), "{:4d}".format(ie)) for ie in range(1, nr_experiments+1)]
     dropdown = Dropdown(label="choose experiment number", menu=menu)    
 

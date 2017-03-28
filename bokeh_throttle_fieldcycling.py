@@ -21,6 +21,7 @@ from bokeh.layouts import column
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
 import stelardatafile as sdf
+from utils import get_x_axis
 
 #specify and import data file
 path=os.path.join(os.path.curdir,'data')
@@ -53,6 +54,8 @@ def modify_doc(doc):
     #calculate the tau for the corresponding fid in each block
     tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #FIXME we need to read the tau from bini and bend (complicated)
     #calculate magnitization amplitudes from fid series, integrate from startpoint to endpoint
+    # TODO: Test the following line:
+    # tau = get_x_axis(parameters)
     startpoint=int(0.05*bs)-1
     endpoint=int(0.1*bs)
     phi=np.zeros(nblk)
