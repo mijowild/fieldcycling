@@ -25,7 +25,7 @@ from utils import get_x_axis
 
 #specify and import data file
 path=os.path.join(os.path.curdir,'data')
-polymer=sdf.StelarDataFile('297K.sdf',path)
+polymer=sdf.StelarDataFile('100kHz-melting.sdf',path)
 polymer.sdfimport()
 nr_experiments = polymer.get_number_of_experiments()
 
@@ -52,10 +52,9 @@ def modify_doc(doc):
                      columns=['real', 'im'])/ns
     fid['magnitude']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
     #calculate the tau for the corresponding fid in each block
-    tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #FIXME we need to read the tau from bini and bend (complicated)
     #calculate magnitization amplitudes from fid series, integrate from startpoint to endpoint
     # TODO: Test the following line:
-    # tau = get_x_axis(parameters)
+    tau = get_x_axis(parameters, nblk)
     startpoint=int(0.05*bs)-1
     endpoint=int(0.1*bs)
     phi=np.zeros(nblk)
@@ -103,7 +102,7 @@ def modify_doc(doc):
         source_fid.data = ColumnDataSource.from_df(fid)
         
         try:
-            tau=np.logspace(-3,np.log10(5*parameters['T1MX']),nblk) #as a dummy
+            tau = get_x_axis(parameters, nblk)
             startpoint=int(0.05*bs)-1
             endpoint=int(0.1*bs)
             phi=np.zeros(nblk)  
