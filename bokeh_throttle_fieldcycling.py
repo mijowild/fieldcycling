@@ -25,7 +25,7 @@ from utils import get_x_axis
 
 #specify and import data file
 path=os.path.join(os.path.curdir,'data')
-polymer=sdf.StelarDataFile('100kHz-melting.sdf',path)
+polymer=sdf.StelarDataFile('297K.sdf',path)
 polymer.sdfimport()
 nr_experiments = polymer.get_number_of_experiments()
 
@@ -63,6 +63,25 @@ def modify_doc(doc):
         end=endpoint + blk * bs
         phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
     df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi']) 
+    
+    # fit exponential decay. 
+    # Options:
+    #    1) Linearize the system, and fit a line to the log of the data.
+    #        - would be prefered, but needs the y-axes offset.
+    #    2) Use a non-linear solver (e.g. scipy.optimize.curve_fit
+    fit_option = 1
+    def model_func(t, A, K, C):
+        return A * np.exp(K * t) + C
+    
+    if fit_option ==1:
+        from utils import fit_exp_linear
+        C0 = 0 # offset
+        popt = fit_exp_linear(df.tau, df.phi, C0)
+    elif fit_option == 2:
+        # needs prior knowledge for p0...
+        from scipy.optimize import curve_fit
+        popt, _ = curve_fit(model_func, np.array(df.tau), np.array(df.phi), p0=[1300, 5.0, 0.0])
+    df['fit_phi'] = model_func(df.tau, *popt)
 
     #convert data to handle in bokeh
     source_fid = ColumnDataSource(data=ColumnDataSource.from_df(fid))
@@ -78,10 +97,9 @@ def modify_doc(doc):
 
 
     p2 = figure(plot_width=300, plot_height=300,
-                title='Magnetization Decay')
+                title='Magn. Decay. {:f}, {:f}, {:f}'.format(*popt))
     p2.circle_cross('tau', 'phi', source=source_df, color="navy")
-
-
+    p2.line('tau', 'fit_phi', source=source_df, color="teal")
 
     def cb(attr, old, new):
         ie = source.data['value'][0]
