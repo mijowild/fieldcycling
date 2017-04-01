@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+import pandas as pd
+
 class StelarDataFile:
     def __init__(self, FileName, PathName):
         self.FileName=FileName
@@ -27,6 +29,11 @@ class StelarDataFile:
 
     def get_number_of_experiments(self):
         return len(self.datas)
+
+    def get_values(self,key):
+        values = [self.getparameter(ie)[key]
+                  for ie in range(1,self.get_number_of_experiments()+1)]
+        return values
 
     def sdfimport(self):
         ie=1
