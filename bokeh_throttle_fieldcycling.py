@@ -169,7 +169,8 @@ def modify_doc(doc):
             tau=np.zeros(nblk)
             phi=np.zeros(nblk)
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
-            df['phi_normalized'] = df['phi'] / (df['phi'].iloc[0] )
+            df['phi_normalized'] = np.zeros(nblk)
+            df['fit_phi'] = np.zeros(nblk)
             source_df.data = ColumnDataSource.from_df(df)
         
     #this source is only used to communicate to the actual callback (cb)
