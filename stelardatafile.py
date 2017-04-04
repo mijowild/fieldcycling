@@ -1,8 +1,6 @@
 import os
 import sys
 import re
-import pandas as pd
-
 class StelarDataFile:
     def __init__(self, FileName, PathName):
         self.FileName=FileName
@@ -30,11 +28,6 @@ class StelarDataFile:
     def get_number_of_experiments(self):
         return len(self.datas)
 
-    def get_values(self,key):
-        values = [self.getparameter(ie)[key]
-                  for ie in range(1,self.get_number_of_experiments()+1)]
-        return values
-
     def sdfimport(self):
         ie=1
         olddir=os.getcwd()
@@ -54,10 +47,14 @@ class StelarDataFile:
                     words[0]=re.sub('[=]','',words[0]) #get rid of '='
                     words[1]=re.sub('[\n]','',words[1])#get rid of trailing \n                
                     try:
-                        words[1]=float(words[1])                                        #floats are converted
-                        exec('parameters[\''+words[0].rstrip()+'\'] = '+str(words[1]))  #and stored as float
+                        words[1]=int(words[1])                                        #ints are converted
+                        exec('parameters[\''+words[0].rstrip()+'\'] = '+str(words[1]))  #and stored as int
                     except ValueError:
-                        exec('parameters[\''+words[0].rstrip()+'\'] = \''+words[1]+'\'')#else its stored as string
+                        try:
+                            words[1]=float(words[1])                                        #floats are converted
+                            exec('parameters[\''+words[0].rstrip()+'\'] = '+str(words[1]))  #and stored as float
+                        except ValueError:
+                            exec('parameters[\''+words[0].rstrip()+'\'] = \''+words[1]+'\'')#else its stored as string
 
                 try:
                      if 'DATA' in words[0]:
