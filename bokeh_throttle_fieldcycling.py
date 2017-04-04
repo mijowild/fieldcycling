@@ -278,7 +278,7 @@ def modify_doc(doc):
     source = ColumnDataSource(data=dict(value=[]))
     source.on_change('data',cb)
     
-    slider = Slider(start=1, end=nr_experiments+1, value=1, step=1,callback_policy='mouseup')
+    slider = Slider(start=1, end=nr_experiments, value=1, step=1,callback_policy='mouseup')
     slider.callback=CustomJS(args=dict(source=source),code="""
         source.data = { value: [cb_obj.value] }
     """)#unfortunately this customjs is needed to throttle the callback in current version of bokeh
