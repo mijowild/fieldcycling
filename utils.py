@@ -2,6 +2,14 @@ import numpy as np
 import numpy.matlib
 from num_string_eval import NumericStringParser
 
+def fit_exp_linear(t, y, C=0):
+    y = y - C
+    y = np.log(y)
+    K, A_log = np.polyfit(t, y, 1)
+    A = np.exp(A_log)
+    popt = [A, K, C]
+    return popt
+
 def get_x_axis(parameters, nblk):
     nsp = NumericStringParser()
     T1MX = parameters['T1MX'] # T1MX is used in the 'eval' expressions below

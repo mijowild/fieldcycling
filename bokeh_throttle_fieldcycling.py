@@ -80,7 +80,35 @@ def modify_doc(doc):
         start=startpoint + blk * bs
         end=endpoint + blk * bs
         phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
-    df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi']) 
+    df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
+    df['phi_normalized']=(df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+    
+    # fit exponential decay. 
+    # Options:
+    #    1) Linearize the system, and fit a line to the log of the data.
+    #        - would be prefered, but needs the y-axes offset.
+    #    2) Use a non-linear solver (e.g. scipy.optimize.curve_fit
+
+    
+    fit_option = 2
+    def model_func(t, A, K, C):
+        return A * np.exp(- K * t) + C
+    def fun(par,t,y):
+        A, K, C = par
+        return model_func(t, A,K,C) - y
+        
+    
+    if fit_option ==1:
+        from utils import fit_exp_linear
+        C0 = 0 # offset
+        popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
+    elif fit_option == 2:
+        # needs prior knowledge for p0...
+        from scipy.optimize import leastsq
+        #popt, _ = curve_fit(model_func, np.array(df.tau), np.array(df.phi_normalized), p0=[1.0, 0.1**-1, 0.0])
+        p0=[1.0, 0.1**-1, 0.0]
+        popt, _ = leastsq(fun, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+    df['fit_phi'] = model_func(df.tau, *popt)
 
     
 
@@ -123,7 +151,8 @@ def modify_doc(doc):
 
     p2 = figure(plot_width=300, plot_height=300,
                 title='Magnetization Decay')
-    p2.circle_cross('tau', 'phi', source=source_df, color="navy")
+    p2.circle_cross('tau', 'phi_normalized', source=source_df, color="navy")
+    p2.line('tau', 'fit_phi', source=source_df, color="teal")
 
 
 ##    p3 = figure(plot_width=300, plot_height=300,
@@ -231,12 +260,57 @@ def modify_doc(doc):
                 end=endpoint + blk * bs
                 phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
+
+            df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+
+            fit_option = 2
+            def model_func(t, A, K, C):
+                return A * np.exp(- K * t) + C
+            def fun(par,t,y):
+                A, K, C = par
+                return model_func(t, A,K,C) - y
+            
+        
+            if fit_option ==1:
+                from utils import fit_exp_linear
+                C0 = 0 # offset
+                popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
+            elif fit_option == 2:
+                # needs prior knowledge for p0...
+                from scipy.optimize import leastsq
+                #popt, _ = curve_fit(model_func, np.array(df.tau), np.array(df.phi_normalized), p0=[1.0, 0.1**-1, 0.0])
+                p0=[1.0, 0.1**-1, 0.0]
+                popt, _ = leastsq(fun, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+            df['fit_phi'] = model_func(df.tau, *popt)
+            df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+
+            fit_option = 2
+            def model_func(t, A, K, C):
+                return A * np.exp(- K * t) + C
+            def fun(par,t,y):
+                A, K, C = par
+                return model_func(t, A,K,C) - y
+            
+        
+            if fit_option ==1:
+                from utils import fit_exp_linear
+                C0 = 0 # offset
+                popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
+            elif fit_option == 2:
+                # needs prior knowledge for p0...
+                from scipy.optimize import leastsq
+                #popt, _ = curve_fit(model_func, np.array(df.tau), np.array(df.phi_normalized), p0=[1.0, 0.1**-1, 0.0])
+                p0=[1.0, 0.1**-1, 0.0]
+                popt, _ = leastsq(fun, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+            df['fit_phi'] = model_func(df.tau, *popt)
             source_df.data = ColumnDataSource.from_df(df)
         except KeyError:
             print('no relaxation experiment found')
             tau=np.zeros(nblk)
             phi=np.zeros(nblk)
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
+            df['phi_normalized'] = np.zeros(nblk)
+            df['fit_phi'] = np.zeros(nblk)
             source_df.data = ColumnDataSource.from_df(df)
         
     #this source is only used to communicate to the actual callback (cb)
