@@ -5,7 +5,7 @@ import sys
 from datetime import datetime
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import re
 from bokeh.charts import Scatter, output_file, show
 from bokeh.sampledata.autompg import autompg as df
@@ -21,14 +21,15 @@ from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
-from bokeh.models.axes import DatetimeAxis
+#from bokeh.models.axes import DatetimeAxis
 from bokeh.server.server import Server
 import stelardatafile as sdf
 from utils import get_x_axis
+from scipy.optimize import leastsq
 
 #specify and import data file
-path=os.path.join(os.path.curdir,'data')
-polymer=sdf.StelarDataFile('297K.sdf',path)
+path=os.path.join(os.path.curdir,'more_data')
+polymer=sdf.StelarDataFile('100kHz-melting.sdf',path)
 polymer.sdfimport()
 nr_experiments = polymer.get_number_of_experiments()
 
@@ -104,7 +105,6 @@ def modify_doc(doc):
         popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
     elif fit_option == 2:
         # needs prior knowledge for p0...
-        from scipy.optimize import leastsq
         #popt, _ = curve_fit(model_func, np.array(df.tau), np.array(df.phi_normalized), p0=[1.0, 0.1**-1, 0.0])
         p0=[1.0, 0.1**-1, 0.0]
         popt, _ = leastsq(fun, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
