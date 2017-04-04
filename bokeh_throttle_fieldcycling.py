@@ -30,6 +30,22 @@ polymer=sdf.StelarDataFile('297K.sdf',path)
 polymer.sdfimport()
 nr_experiments = polymer.get_number_of_experiments()
 
+# parameters to dataframe
+par=[]
+for ie in range(nr_experiments):
+    par.append(polymer.getparameter(ie+1))
+par_df=pd.DataFrame(par)
+columns=sorted(par_df.columns)
+discrete = [x for x in columns if par_df[x].dtype == object]
+continuous = [x for x in columns if x not in discrete]
+quantileable = [x for x in continuous if len(par_df[x].unique()) > 20]
+
+print(columns)
+print(discrete)
+print(continuous)
+print(quantileable)
+    
+
 io_loop = IOLoop.current()
 #initially set experiment number ie=1
 ie = 1
@@ -75,7 +91,7 @@ def modify_doc(doc):
     # i know there is a pythonic oneliner for the next couple of lines forgive me with lambda: something i dont remember at the moment :)
     par_y=[]
     par_x=[]
-    for i in range(1, nr_experiments):
+    for i in range(nr_experiments):
         # 
         
         try:
@@ -166,7 +182,7 @@ def modify_doc(doc):
     source = ColumnDataSource(data=dict(value=[]))
     source.on_change('data',cb)
     
-    slider = Slider(start=1, end=nr_experiments, value=1, step=1,callback_policy='mouseup')
+    slider = Slider(start=1, end=nr_experiments+1, value=1, step=1,callback_policy='mouseup')
     slider.callback=CustomJS(args=dict(source=source),code="""
         source.data = { value: [cb_obj.value] }
     """)#unfortunately this customjs is needed to throttle the callback in current version of bokeh
