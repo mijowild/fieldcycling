@@ -21,6 +21,7 @@ from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
+from bokeh.models.axes import DatetimeAxis
 from bokeh.server.server import Server
 import stelardatafile as sdf
 from utils import get_x_axis
@@ -39,11 +40,11 @@ par_df=pd.DataFrame(par)
 
 # categorize the data
 columns=sorted(par_df.columns)
-discrete = [x for x in columns if par_df[x].dtype == object]
+discrete = [x for x in columns if (par_df[x].dtype == object or par_df[x].dtype == str)]
 continuous = [x for x in columns if x not in discrete]
+time = [x for x in continuous if x=='TIME']
+#continuous.remove('TIME')
 quantileable = [x for x in continuous if len(par_df[x].unique()) > 20]
-
-
 
 
 io_loop = IOLoop.current()
@@ -131,7 +132,7 @@ def modify_doc(doc):
 
     
 
-    # in the plot 4 use following
+    # in the plot 4 use followingimpo
     SIZES = list(range(6, 22, 3)) # for some sizes
     COLORS = Spectral5 # for some colors
 
@@ -141,29 +142,44 @@ def modify_doc(doc):
         x_title = x.value.title()
         y_title = y.value.title()
 
+        
+
         kw = dict()
+           
         if x.value in discrete:
             kw['x_range'] = sorted(set(xs))
         if y.value in discrete:
             kw['y_range'] = sorted(set(ys))
+        if y.value in time:
+            kw['y_axis_type'] = 'datetime'
+        if x.value in time:
+            kw['x_axis_type'] = 'datetime'
+        
+            
         kw['title']="%s vs %s" % (x_title, y_title)
 
-        p4 = figure(plot_height=600, plot_width=800, tools='pan,box_zoom,reset', **kw)
+
+        p4 = figure(plot_height=300, plot_width=600, tools='pan,box_zoom,reset',
+                    **kw)
+
         p4.xaxis.axis_label = x_title
         p4.yaxis.axis_label = y_title
 
+
         if x.value in discrete:
             p4.xaxis.major_label_orientation = pd.np.pi / 4 # rotates labels... ugh. how about some datetime madness
-
+                    
         sz = 9
         if size.value != 'None':
-            groups = pd.qcut(par_df[size.value].values, len(SIZES))
+            groups = pd.qcut(pd.to_numeric(par_df[size.value].values), len(SIZES))
             sz = [SIZES[xx] for xx in groups.codes]
 
         c = "#31AADE"
         if color.value != 'None':
-            groups = pd.qcut(par_df[color.value].values, len(COLORS))
+            groups = pd.qcut(pd.to_numeric(par_df[color.value]).values, len(COLORS))
             c = [COLORS[xx] for xx in groups.codes]
+
+        
         p4.circle(x=xs, y=ys, color=c, size=sz, line_color="white", alpha=0.6, hover_color='white', hover_alpha=0.5)
 
         return p4

@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+import pandas as pd
+
 class StelarDataFile:
     def __init__(self, FileName, PathName):
         self.FileName=FileName
@@ -45,7 +47,8 @@ class StelarDataFile:
                 #read the parameters of file
                 if len(words)==2:
                     words[0]=re.sub('[=]','',words[0]) #get rid of '='
-                    words[1]=re.sub('[\n]','',words[1])#get rid of trailing \n                
+                    words[1]=re.sub('[\n]','',words[1])#get rid of trailing \n
+                    words[1]=re.sub('[\t]','',words[1])#get rid of \t
                     try:
                         words[1]=int(words[1])                                        #ints are converted
                         exec('parameters[\''+words[0].rstrip()+'\'] = '+str(words[1]))  #and stored as int
@@ -55,6 +58,12 @@ class StelarDataFile:
                             exec('parameters[\''+words[0].rstrip()+'\'] = '+str(words[1]))  #and stored as float
                         except ValueError:
                             exec('parameters[\''+words[0].rstrip()+'\'] = \''+words[1]+'\'')#else its stored as string
+                    if words[0]=='TIME':
+                        try:
+                            parameters['TIME']=pd.to_datetime(words[1])
+                        except:
+                            print('Time cannot be read')
+                        
 
                 try:
                      if 'DATA' in words[0]:
