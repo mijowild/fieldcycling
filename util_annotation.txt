@@ -4,3 +4,4 @@ if the function works, i am fine with it. if we ever have to rewrite it we can t
 	* typically the list type looks something like 0.1:10;5:LIN;15;20.
 	* there the list contains 7 points 5 are on a linscale between 0.1 and 10s and two additional points at 15, and 20 seconds. seperate at any delimiter. lookup any occurence of 'LIN' and 'LOG' in the list.  lookup whether the lin log occurence and treat the lin/logspaces in the list. treat the remaining list entries as single points.
 	* still i would like to come up with a way to avoid the eval function. if you google eval you will see it is quite easy to do evil stuff with it.
+        - eval is not being used at this time. We are using NumericStringParser.eval, which doesn't have the security concerns.
