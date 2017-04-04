@@ -12,13 +12,14 @@ from bokeh.sampledata.autompg import autompg as df
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.io import output_file, show
 from bokeh.plotting import figure
+from bokeh.palettes import Spectral5
 from bokeh.layouts import widgetbox
-from bokeh.models.widgets import Dropdown
+from bokeh.models.widgets import Dropdown, Select
 from bokeh.models.callbacks import CustomJS
 from tornado.ioloop import IOLoop
 from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
-from bokeh.layouts import column
+from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
 import stelardatafile as sdf
@@ -35,16 +36,15 @@ par=[]
 for ie in range(nr_experiments):
     par.append(polymer.getparameter(ie+1))
 par_df=pd.DataFrame(par)
+
+# categorize the data
 columns=sorted(par_df.columns)
 discrete = [x for x in columns if par_df[x].dtype == object]
 continuous = [x for x in columns if x not in discrete]
 quantileable = [x for x in continuous if len(par_df[x].unique()) > 20]
 
-print(columns)
-print(discrete)
-print(continuous)
-print(quantileable)
-    
+
+
 
 io_loop = IOLoop.current()
 #initially set experiment number ie=1
@@ -86,31 +86,31 @@ def modify_doc(doc):
     # get a plot of two parameters:
     # TODO write function which takes parameter name and returns list with values of all values found in the object
     # start with zone, vs time. # TODO choose any parameter from the dropdown and think of nice visualization
-    par_x_name = 'ZONE'
-    par_y_name = 'TIME'
-    # i know there is a pythonic oneliner for the next couple of lines forgive me with lambda: something i dont remember at the moment :)
-    par_y=[]
-    par_x=[]
-    for i in range(nr_experiments):
-        # 
-        
-        try:
-            par_y.append(pd.to_datetime(polymer.getparameter(i)[par_y_name]))
-        except:
-            print('bla')
-            par_y.append(polymer.getparameter(i)[par_y_name])
-        try:
-            par_x.append(pd.to_datetime(polymer.getparameter(i)[par_x_name]))
-        except:
-            print('bla')
-            par_x.append(polymer.getparameter(i)[par_x_name])
-    
-    df_par = pd.DataFrame(data=np.c_[par_x, par_y], columns=[par_x_name, par_y_name])
+##    par_x_name = 'ZONE'
+##    par_y_name = 'TIME'
+##    # i know there is a pythonic oneliner for the next couple of lines forgive me with lambda: something i dont remember at the moment :)
+##    par_y=[]
+##    par_x=[]
+##    for i in range(nr_experiments):
+##        # 
+##        
+##        try:
+##            par_y.append(pd.to_datetime(polymer.getparameter(i)[par_y_name]))
+##        except:
+##            print('bla')
+##            par_y.append(polymer.getparameter(i)[par_y_name])
+##        try:
+##            par_x.append(pd.to_datetime(polymer.getparameter(i)[par_x_name]))
+##        except:
+##            print('bla')
+##            par_x.append(polymer.getparameter(i)[par_x_name])
+##    
+##    df_par = pd.DataFrame(data=np.c_[par_x, par_y], columns=[par_x_name, par_y_name])
 
     # convert data to handle in bokeh
     source_fid = ColumnDataSource(data=ColumnDataSource.from_df(fid))
     source_df = ColumnDataSource(data=ColumnDataSource.from_df(df))
-    source_par = ColumnDataSource(data=ColumnDataSource.from_df(df_par))
+##    source_par = ColumnDataSource(data=ColumnDataSource.from_df(df_par))
     
     # create and plot figures
     p1 = figure(plot_width=300, plot_height=300,
@@ -125,12 +125,57 @@ def modify_doc(doc):
     p2.circle_cross('tau', 'phi', source=source_df, color="navy")
 
 
-    p3 = figure(plot_width=300, plot_height=300,
-                title='Parameter Plot',y_axis_type="datetime")
-    p3.circle_cross(par_x_name, par_y_name, source=source_par, color="red")
+##    p3 = figure(plot_width=300, plot_height=300,
+##                title='Parameter Plot',y_axis_type="datetime")
+##    p3.circle_cross(par_x_name, par_y_name, source=source_par, color="red")
+
     
 
+    # in the plot 4 use following
+    SIZES = list(range(6, 22, 3)) # for some sizes
+    COLORS = Spectral5 # for some colors
 
+    def plot_par():
+        xs = par_df[x.value].values
+        ys = par_df[y.value].values
+        x_title = x.value.title()
+        y_title = y.value.title()
+
+        kw = dict()
+        if x.value in discrete:
+            kw['x_range'] = sorted(set(xs))
+        if y.value in discrete:
+            kw['y_range'] = sorted(set(ys))
+        kw['title']="%s vs %s" % (x_title, y_title)
+
+        p4 = figure(plot_height=600, plot_width=800, tools='pan,box_zoom,reset', **kw)
+        p4.xaxis.axis_label = x_title
+        p4.yaxis.axis_label = y_title
+
+        if x.value in discrete:
+            p4.xaxis.major_label_orientation = pd.np.pi / 4 # rotates labels... ugh. how about some datetime madness
+
+        sz = 9
+        if size.value != 'None':
+            groups = pd.qcut(par_df[size.value].values, len(SIZES))
+            sz = [SIZES[xx] for xx in groups.codes]
+
+        c = "#31AADE"
+        if color.value != 'None':
+            groups = pd.qcut(par_df[color.value].values, len(COLORS))
+            c = [COLORS[xx] for xx in groups.codes]
+        p4.circle(x=xs, y=ys, color=c, size=sz, line_color="white", alpha=0.6, hover_color='white', hover_alpha=0.5)
+
+        return p4
+
+    def update(attr, old, new):
+        layout_p4.children[1] = plot_par()
+
+
+    print(columns)
+    print(discrete)
+    print(continuous)
+    print(quantileable)
 
     def cb(attr, old, new):
         ie = source.data['value'][0]
@@ -189,16 +234,37 @@ def modify_doc(doc):
 
     # choose the parameters for plot p3 in a dropdown menu
     #parameters given may vary in one file, merge the parameters
-    merge_par=parameters
-    for i in range(1,nr_experiments):
-        add_par=polymer.getparameter(i) #read the parameters
-        merge_par.update(add_par) #and merge them into one dictionary
-    
-    menu = [(key, "None") for key in merge_par.keys()] 
-    dropdown_x_par = Dropdown(label="parameter x-axis", menu=menu)    
-    dropdown_y_par = Dropdown(label="parameter y-axis", menu=menu)    
+##    merge_par=parameters
+##    for i in range(1,nr_experiments):
+##        add_par=polymer.getparameter(i) #read the parameters
+##        merge_par.update(add_par) #and merge them into one dictionary
+##    
+##    menu = [(key, "None") for key in merge_par.keys()] 
+##    dropdown_x_par = Dropdown(label="parameter x-axis", menu=menu)    
+##    dropdown_y_par = Dropdown(label="parameter y-axis", menu=menu)
 
-    doc.add_root(column(slider, p1, p2, p3, dropdown_x_par, dropdown_y_par))
+
+    
+    # try to add some select boxes for p4
+    x = Select(title='X-Axis', value='ZONE', options=columns)
+    x.on_change('value', update)
+
+    y = Select(title='Y-Axis', value='TIME', options=columns)
+    y.on_change('value', update)
+
+    size = Select(title='Size', value='None', options=['None'] + quantileable)
+    size.on_change('value', update)
+
+    color = Select(title='Color', value='None', options=['None'] + quantileable)
+    color.on_change('value', update)
+
+
+    controls_p4 = widgetbox([x,y,color,size], width=150)
+    layout_p4 = row(controls_p4,plot_par())
+    doc.add_root(column(slider, p1, p2,
+                        #p3, dropdown_x_par, dropdown_y_par,
+                        ))
+    doc.add_root(layout_p4)
     doc.add_root(source) # i need to add the source for some reason...
 
 bokeh_app = Application(FunctionHandler(modify_doc))
