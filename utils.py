@@ -10,6 +10,20 @@ def fit_exp_linear(t, y, C=0):
     popt = [A, K, C]
     return popt
 
+def model_exp_dec(t, A, K, C):
+    return A * np.exp(- K * t) + C
+def fun_exp_dec(par,t,y):
+    A, K, C = par
+    return model_exp_dec(t, A,K,C) - y
+    
+def get_mag_amplitude(fid,startpoint, endpoint, nblk, bs):
+    phi=np.zeros(nblk)
+    for blk in range(nblk):
+        start=startpoint + blk * bs-1
+        end=endpoint + blk * bs
+        phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
+    return phi
+
 def get_x_axis(parameters, nblk):
     nsp = NumericStringParser()
     T1MX = parameters['T1MX'] # T1MX is used in the 'eval' expressions below

@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 import re
 from bokeh.charts import Scatter, output_file, show
-from bokeh.sampledata.autompg import autompg as df
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.io import output_file, show
 from bokeh.plotting import figure
@@ -22,7 +21,7 @@ from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
 import stelardatafile as sdf
-from utils import get_x_axis
+from utils import get_x_axis, model_exp_dec, fun_exp_dec, get_mag_amplitude
 from scipy.optimize import leastsq
 
 #specify and import data file
@@ -32,10 +31,12 @@ polymer.sdfimport()
 nr_experiments = polymer.get_number_of_experiments()
 
 # parameters to dataframe
-par=[]
-for ie in range(nr_experiments):
-    par.append(polymer.getparameter(ie+1))
-par_df=pd.DataFrame(par)
+par_df=pd.DataFrame()
+for ppiepigpii in range(1):
+    par=[]
+    for ie in range(nr_experiments):
+        par.append(polymer.getparameter(ie+1))
+    par_df=pd.DataFrame(par)
 
 # categorize the data
 columns=sorted(par_df.columns)
@@ -73,14 +74,9 @@ def modify_doc(doc):
     tau = get_x_axis(parameters, nblk)
 
     #calculate magnetization:
-    #integrate fids from start- to endpoint to get the amplitude
-    startpoint=int(0.05*bs)-1
+    startpoint=int(0.05*bs)
     endpoint=int(0.1*bs) #TODO: make a range slider to get start- and endpoint interactively
-    phi=np.zeros(nblk)
-    for blk in range(nblk):
-        start=startpoint + blk * bs
-        end=endpoint + blk * bs
-        phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
+    phi = get_mag_amplitude(fid, startpoint, endpoint, nblk, bs)
     df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
     df['phi_normalized']=(df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
     
@@ -92,12 +88,6 @@ def modify_doc(doc):
 
     
     fit_option = 2
-    def model_func(t, A, K, C):
-        return A * np.exp(- K * t) + C
-    def fun(par,t,y):
-        A, K, C = par
-        return model_func(t, A,K,C) - y
-        
     
     if fit_option ==1:
         from utils import fit_exp_linear
@@ -106,12 +96,10 @@ def modify_doc(doc):
     elif fit_option == 2:
         # needs prior knowledge for p0...        
         p0=[1.0, 0.1**-1, 0.0]
-        popt, _ = leastsq(fun, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
-    df['fit_phi'] = model_func(df.tau, *popt)
-
+        popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+    df['fit_phi'] = model_exp_dec(df.tau, *popt)
     
 
-    
     # convert data to handle in bokeh
     source_fid = ColumnDataSource(data=ColumnDataSource.from_df(fid))
     source_df = ColumnDataSource(data=ColumnDataSource.from_df(df))
@@ -140,10 +128,7 @@ def modify_doc(doc):
         x_title = x.value.title()
         y_title = y.value.title()
 
-        
-
-        kw = dict()
-           
+        kw = dict() #holds optional keyword arguments for figure()   
         if x.value in discrete:
             kw['x_range'] = sorted(set(xs))
         if y.value in discrete:
@@ -176,20 +161,12 @@ def modify_doc(doc):
         if color.value != 'None':
             groups = pd.qcut(pd.to_numeric(par_df[color.value]).values, len(COLORS))
             c = [COLORS[xx] for xx in groups.codes]
-
-        
+       
         p4.circle(x=xs, y=ys, color=c, size=sz, line_color="white", alpha=0.6, hover_color='white', hover_alpha=0.5)
-
         return p4
 
     def update(attr, old, new):
         layout_p4.children[1] = plot_par()
-
-
-    print(columns)
-    print(discrete)
-    print(continuous)
-    print(quantileable)
 
     def cb(attr, old, new):
         ie = source.data['value'][0]
@@ -215,25 +192,13 @@ def modify_doc(doc):
         
         try:
             tau = get_x_axis(parameters, nblk)
-            startpoint=int(0.05*bs)-1
+            startpoint=int(0.05*bs)
             endpoint=int(0.1*bs)
-            phi=np.zeros(nblk)  
-            for blk in range(nblk):
-                start=startpoint + blk * bs
-                end=endpoint + blk * bs
-                phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
+            phi = get_mag_amplitude(fid, startpoint, endpoint, nblk, bs)
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
-
             df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
 
-            fit_option = 2
-            def model_func(t, A, K, C):
-                return A * np.exp(- K * t) + C
-            def fun(par,t,y):
-                A, K, C = par
-                return model_func(t, A,K,C) - y
-            
-        
+            fit_option = 2 # better to migrate the fitting routine to someplace else. maybe some models or fitting class?
             if fit_option ==1:
                 from utils import fit_exp_linear
                 C0 = 0 # offset
@@ -242,28 +207,9 @@ def modify_doc(doc):
                 # needs prior knowledge for p0...
                 from scipy.optimize import leastsq
                 p0=[1.0, 0.1**-1, 0.0]
-                popt, _ = leastsq(fun, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
-            df['fit_phi'] = model_func(df.tau, *popt)
+                popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+            df['fit_phi'] = model_exp_dec(df.tau, *popt)
             df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
-
-            fit_option = 2
-            def model_func(t, A, K, C):
-                return A * np.exp(- K * t) + C
-            def fun(par,t,y):
-                A, K, C = par
-                return model_func(t, A,K,C) - y
-            
-        
-            if fit_option ==1:
-                from utils import fit_exp_linear
-                C0 = 0 # offset
-                popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
-            elif fit_option == 2:
-                # needs prior knowledge for p0...
-                from scipy.optimize import leastsq
-                p0=[1.0, 0.1**-1, 0.0]
-                popt, _ = leastsq(fun, p0, args=(np.array(df.tau),np.array(df.phi_normalized)) )
-            df['fit_phi'] = model_func(df.tau, *popt)
             source_df.data = ColumnDataSource.from_df(df)
         except KeyError:
             print('no relaxation experiment found')
