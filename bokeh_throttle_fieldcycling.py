@@ -79,6 +79,7 @@ def modify_doc(doc):
     phi = get_mag_amplitude(fid, startpoint, endpoint, nblk, bs)
     df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
     df['phi_normalized']=(df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+    polymer.addparameter(ie,'df_magnetization',df)
     
     # fit exponential decay. 
     # Options:
@@ -117,7 +118,7 @@ def modify_doc(doc):
     p2.circle_cross('tau', 'phi_normalized', source=source_df, color="navy")
     p2.line('tau', 'fit_phi', source=source_df, color="teal")
 
-
+    
     # in the plot 4 use followingimpo
     SIZES = list(range(6, 22, 3)) # for some sizes
     COLORS = Spectral5 # for some colors
@@ -198,6 +199,8 @@ def modify_doc(doc):
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
             df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
 
+            polymer.addparameter(ie,'df_magnetization',df)
+
             fit_option = 2 # better to migrate the fitting routine to someplace else. maybe some models or fitting class?
             if fit_option ==1:
                 from utils import fit_exp_linear
@@ -246,9 +249,72 @@ def modify_doc(doc):
 
     controls_p4 = widgetbox([x,y,color,size], width=150)
     layout_p4 = row(controls_p4,plot_par())
-    doc.add_root(column(slider, p1, p2))
+
+    
+    
+    #fitting on all experiments
+    p3 = figure(plot_width=300, plot_height=300,
+            title='normalized phi vs normalized tau', webgl = True)
+                #y_axis_type = 'log',
+                #x_axis_type = 'linear')
+    
+    #p3_df = pd.DataFrame()
+    for i in range(nr_experiments):
+        try:
+            #
+            #
+            #
+            #
+            paramters=polymer.getparameter(i)
+            nblk=parameters['NBLK']
+            bs=parameters['BS']            
+            tau = get_x_axis(parameters, nblk)
+            startpoint=int(0.05*bs)
+            endpoint=int(0.1*bs) #TODO: make a range slider to get start- and endpoint interactively
+            phi = get_mag_amplitude(fid, startpoint, endpoint, nblk, bs)
+            df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
+            df['phi_normalized']=(df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+            polymer.addparameter(i,'df_magnetization',df)
+            
+            fit_option = 2
+            if fit_option ==1:
+                from utils import fit_exp_linear
+                C0 = 0 # offset
+                popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
+            elif fit_option == 2:
+                # needs prior knowledge for p0...        
+                p0=[1.0, 0.1**-1, 0.0]
+                popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+                polymer.addparameter(i,'amp',popt[0])
+                polymer.addparameter(i,'r1',popt[1])
+                polymer.addparameter(i,'noise',popt[2])
+                p3_df['tau_norm'] = popt[1]*df.tau
+                p3_df['phi_norm'] = popt[0]**-1*df.phi_normalized-popt[2] # klammer um phi-noise?
+
+                print(p3_df)
+                source_p3=ColumnDataSource(data=ColumnDataSource.from_df(p3_df))
+                p3.line('tau_norm', 'phi_norm', source=source_p3, color='green')
+ #               source_fid = ColumnDataSource(data=ColumnDataSource.from_df(fid))
+  #  p1.line('index', 'real', source=source_fid, color='green')
+                #
+                #
+                #
+                #
+                #
+        except:
+            print(i)
+
+        
+
+
+    doc.add_root(column(slider, p1, p2, p3))
     doc.add_root(layout_p4)
     doc.add_root(source) # i need to add the source for some reason...
+
+##    source_p3.data=ColumnDataSource.from_df(p3_df)
+##    p3.line(source=source_p3, line_width=5, alpha=0.6, hover_color='white', hover_alpha=0.5)
+
+    
 
 bokeh_app = Application(FunctionHandler(modify_doc))
 

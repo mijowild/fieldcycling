@@ -30,6 +30,11 @@ class StelarDataFile:
     def get_number_of_experiments(self):
         return len(self.datas)
 
+    def addparameter(self, ie, par, val):
+        parameter, data = self.datas[ie]
+        parameter[par] = val
+        self.adddata(ie,parameter,data)
+
     def sdfimport(self):
         ie=1
         olddir=os.getcwd()
