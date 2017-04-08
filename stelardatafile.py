@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import numpy as np
 import pandas as pd
 
 class StelarDataFile:
@@ -27,6 +28,25 @@ class StelarDataFile:
         parameter, data = self.datas[ie]
         return data
 
+    def getfid(self,ie):
+        parameters=self.getparameter(ie)
+        bs=int(parameters['BS'])
+        try:
+            nblk=int(parameters['NBLK'])
+        except:
+            nblk=1;
+        ns=int(parameters['NS'])
+        try:
+            dw=parameters['DW']*1e-6 #dwell time is in [mu s]
+        except:
+            dw=1
+
+        #calculate series of fid
+        fid=pd.DataFrame(self.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*nblk),
+                         columns=['real', 'im'])/ns
+        fid['magnitude']=( fid['real']**2 + fid['im']**2 )**0.5
+        return fid
+    
     def get_number_of_experiments(self):
         return len(self.datas)
 

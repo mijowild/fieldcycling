@@ -254,24 +254,20 @@ def modify_doc(doc):
     
     #fitting on all experiments
     p3 = figure(plot_width=300, plot_height=300,
-            title='normalized phi vs normalized tau', webgl = True)
-                #y_axis_type = 'log',
-                #x_axis_type = 'linear')
+            title='normalized phi vs normalized tau', webgl = True,
+                y_axis_type = 'log',
+                x_axis_type = 'linear')
     
     #p3_df = pd.DataFrame()
     for i in range(nr_experiments):
         try:
-            #
-            #
-            #
-            #
-            paramters=polymer.getparameter(i)
-            nblk=parameters['NBLK']
-            bs=parameters['BS']            
-            tau = get_x_axis(parameters, nblk)
-            startpoint=int(0.05*bs)
-            endpoint=int(0.1*bs) #TODO: make a range slider to get start- and endpoint interactively
-            phi = get_mag_amplitude(fid, startpoint, endpoint, nblk, bs)
+            par=polymer.getparameter(i)
+            fid=polymer.getfid(i)
+            tau = get_x_axis(polymer.getparameter(i), polymer.getparameter(i)['NBLK'])
+            startpoint=int(0.05*polymer.getparameter(i)['BS'])
+            endpoint=int(0.1*polymer.getparameter(i)['BS']) #TODO: make a range slider to get start- and endpoint interactively
+            phi = get_mag_amplitude(fid, startpoint, endpoint,
+                                    polymer.getparameter(i)['NBLK'], polymer.getparameter(i)['BS'])
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
             df['phi_normalized']=(df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
             polymer.addparameter(i,'df_magnetization',df)
@@ -285,29 +281,22 @@ def modify_doc(doc):
                 # needs prior knowledge for p0...        
                 p0=[1.0, 0.1**-1, 0.0]
                 popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+                #print(popt)
                 polymer.addparameter(i,'amp',popt[0])
                 polymer.addparameter(i,'r1',popt[1])
                 polymer.addparameter(i,'noise',popt[2])
-                p3_df['tau_norm'] = popt[1]*df.tau
-                p3_df['phi_norm'] = popt[0]**-1*df.phi_normalized-popt[2] # klammer um phi-noise?
-
-                print(p3_df)
+                tau = popt[1]*df.tau
+                phi = popt[0]**-1*(df.phi_normalized-popt[2])
+                p3_df=pd.DataFrame(data=np.c_[ tau, phi ], columns=['tau', 'phi'])
                 source_p3=ColumnDataSource(data=ColumnDataSource.from_df(p3_df))
-                p3.line('tau_norm', 'phi_norm', source=source_p3, color='green')
- #               source_fid = ColumnDataSource(data=ColumnDataSource.from_df(fid))
-  #  p1.line('index', 'real', source=source_fid, color='green')
-                #
-                #
-                #
-                #
-                #
-        except:
-            print(i)
+                p3.line('tau', 'phi', source=source_p3) #TODO add nice colors
+        except KeyError:
+            print('no relaxation experiment found')
 
         
 
 
-    doc.add_root(column(slider, p1, p2, p3))
+    doc.add_root(column(slider, p1, p2))
     doc.add_root(layout_p4)
     doc.add_root(source) # i need to add the source for some reason...
 
