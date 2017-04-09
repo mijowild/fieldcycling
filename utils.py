@@ -15,6 +15,22 @@ def model_exp_dec(t, A, K, C):
 def fun_exp_dec(par,t,y):
     A, K, C = par
     return model_exp_dec(t, A,K,C) - y
+
+def magnetization_fit(df,p0,fit_option):
+    # fit exponential decay. 
+    # Options:
+    #    1) Linearize the system, and fit a line to the log of the data.
+    #        - would be prefered, but needs the y-axes offset.
+    #    2) Use a non-linear solver (e.g. scipy.optimize.curve_fit
+    if fit_option ==1:
+        C0 = 0 # offset
+        popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
+    elif fit_option == 2:
+        from scipy.optimize import leastsq
+        popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
+    df['fit_phi'] = model_exp_dec(df.tau, *popt)
+    df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+    return df, popt
     
 def get_mag_amplitude(fid,startpoint, endpoint, nblk, bs):
     phi=np.zeros(nblk)
@@ -24,8 +40,9 @@ def get_mag_amplitude(fid,startpoint, endpoint, nblk, bs):
         phi[blk]=fid['magnitude'].iloc[start:end].sum() / (endpoint-startpoint)
     return phi
 
-def get_x_axis(parameters, nblk):
+def get_x_axis(parameters):
     nsp = NumericStringParser()
+    nblk = parameters['NBLK']
     T1MX = parameters['T1MX'] # T1MX is used in the 'eval' expressions below
     # TODO: not tested yet for all cases
     if parameters['BGRD'] == 'LIST':

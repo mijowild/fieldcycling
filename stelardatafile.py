@@ -28,6 +28,9 @@ class StelarDataFile:
         parameter, data = self.datas[ie]
         return data
 
+    def getparvalue(self,ie,par):
+        return self.getparameter(ie)[par]
+
     def getfid(self,ie):
         parameters=self.getparameter(ie)
         bs=int(parameters['BS'])

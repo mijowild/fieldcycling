@@ -21,7 +21,7 @@ from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
 import stelardatafile as sdf
-from utils import get_x_axis, model_exp_dec, fun_exp_dec, get_mag_amplitude
+from utils import get_x_axis, model_exp_dec, fun_exp_dec, get_mag_amplitude, magnetization_fit
 from scipy.optimize import leastsq
 
 #specify and import data file
@@ -51,53 +51,28 @@ io_loop = IOLoop.current()
 ie = 1
 
 def modify_doc(doc):
-    #lookup parameters for calculation of fid
-    parameters=polymer.getparameter(ie)
-    bs=int(parameters['BS'])
-    try:
-        nblk=int(parameters['NBLK'])
-    except:
-        nblk=1;
-    ns=int(parameters['NS'])
-    try:
-        dw=parameters['DW']*1e-6 #dwell time is in [mu s]
-    except:
-        dw=1
-    temperature=parameters['TEMP']
-
-    #calculate series of fid
-    fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*nblk),
-                     columns=['real', 'im'])/ns
-    fid['magnitude']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
-
+    fid=polymer.getfid(ie) #dataframe
     # TODO: more testing on get_x_axis
-    tau = get_x_axis(parameters, nblk)
+    tau = get_x_axis(polymer.getparameter(ie))
 
     #calculate magnetization:
-    startpoint=int(0.05*bs)
-    endpoint=int(0.1*bs) #TODO: make a range slider to get start- and endpoint interactively
-    phi = get_mag_amplitude(fid, startpoint, endpoint, nblk, bs)
+    startpoint=int(0.05*polymer.getparvalue(ie,'BS'))
+    endpoint=int(0.1*polymer.getparvalue(ie,'BS')) #TODO: make a range slider to get start- and endpoint interactively
+    phi = get_mag_amplitude(fid, startpoint, endpoint,
+                            polymer.getparvalue(ie,'NBLK'),
+                            polymer.getparvalue(ie,'BS'))
+
+    #prepare magnetization decay curve for fit
     df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
     df['phi_normalized']=(df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
     polymer.addparameter(ie,'df_magnetization',df)
     
-    # fit exponential decay. 
-    # Options:
-    #    1) Linearize the system, and fit a line to the log of the data.
-    #        - would be prefered, but needs the y-axes offset.
-    #    2) Use a non-linear solver (e.g. scipy.optimize.curve_fit
 
     
     fit_option = 2
+    p0 = [1 , 2 * polymer.getparvalue(ie,'T1MX')**-1, 0]
+    df, popt = magnetization_fit(df, p0, fit_option)
     
-    if fit_option ==1:
-        from utils import fit_exp_linear
-        C0 = 0 # offset
-        popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
-    elif fit_option == 2:
-        # needs prior knowledge for p0...        
-        p0=[1.0, 0.1**-1, 0.0]
-        popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
     df['fit_phi'] = model_exp_dec(df.tau, *popt)
     
 
@@ -121,7 +96,7 @@ def modify_doc(doc):
     
     # in the plot 4 use followingimpo
     SIZES = list(range(6, 22, 3)) # for some sizes
-    COLORS = Spectral5 # for some colors
+    COLORS = Spectral5 # for some colors (more colors would be nice somehow)
 
     def plot_par():
         xs = par_df[x.value].values
@@ -129,7 +104,7 @@ def modify_doc(doc):
         x_title = x.value.title()
         y_title = y.value.title()
 
-        kw = dict() #holds optional keyword arguments for figure()   
+        kw = dict() #holds optional keyword arguments for figure()
         if x.value in discrete:
             kw['x_range'] = sorted(set(xs))
         if y.value in discrete:
@@ -151,7 +126,7 @@ def modify_doc(doc):
 
 
         if x.value in discrete:
-            p4.xaxis.major_label_orientation = pd.np.pi / 4 # rotates labels... ugh. how about some datetime madness
+            p4.xaxis.major_label_orientation = pd.np.pi / 4 # rotates labels...
                     
         sz = 9
         if size.value != 'None':
@@ -171,49 +146,24 @@ def modify_doc(doc):
 
     def cb(attr, old, new):
         ie = source.data['value'][0]
-        parameters=polymer.getparameter(ie)
-        bs=int(parameters['BS'])
-        try:
-            nblk=int(parameters['NBLK'])
-        except:
-            nblk=1;
-        ns=int(parameters['NS'])
-        try:
-            dw=parameters['DW']*1e-6 #dwell time is in [mu s]
-        except:
-            dw=1
-        temperature=parameters['TEMP']
-        fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*nblk),
-                         columns=['real', 'im'])/ns
-        fid['magnitude']=( fid['real']**2 + fid['im']**2 )**0.5 # last two lines may represent a seperate method
-        fid=pd.DataFrame(polymer.getdata(ie),index=np.linspace(dw,dw*bs*nblk,bs*nblk),
-                     columns=['real', 'im'])/ns
-        fid['magnitude']=( fid['real']**2 + fid['im']**2 )**0.5
+        fid = polymer.getfid(ie)
         source_fid.data = ColumnDataSource.from_df(fid)
         
         try:
-            tau = get_x_axis(parameters, nblk)
-            startpoint=int(0.05*bs)
-            endpoint=int(0.1*bs)
-            phi = get_mag_amplitude(fid, startpoint, endpoint, nblk, bs)
+            tau = get_x_axis(polymer.getparameter)
+            startpoint=int(0.05*polymer.getparvalue(ie,'BS'))
+            endpoint=int(0.1*polymer.getparvalue(ie,'BS'))
+            phi = get_mag_amplitude(fid, startpoint, endpoint,
+                                    polymer.getparvalue(ie,'NBLK'),
+                                    polymer.getparvalue(ie,'BS'))
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
             df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
-
             polymer.addparameter(ie,'df_magnetization',df)
-
-            fit_option = 2 # better to migrate the fitting routine to someplace else. maybe some models or fitting class?
-            if fit_option ==1:
-                from utils import fit_exp_linear
-                C0 = 0 # offset
-                popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
-            elif fit_option == 2:
-                # needs prior knowledge for p0...
-                from scipy.optimize import leastsq
-                p0=[1.0, 0.1**-1, 0.0]
-                popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
-            df['fit_phi'] = model_exp_dec(df.tau, *popt)
-            df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+            fit_option = 2 #mono exponential, 3 parameter fit
+            p0=[1.0, polymer.getparvalue(ie,'T1MX')**-1*2, 0]
+            df, popt = magnetization_fit(df, p0, fit_option)
             source_df.data = ColumnDataSource.from_df(df)
+            polymer.addparameter(ie,'popt(mono_exp)',popt)
         except KeyError:
             print('no relaxation experiment found')
             tau=np.zeros(nblk)
@@ -258,12 +208,13 @@ def modify_doc(doc):
                 y_axis_type = 'log',
                 x_axis_type = 'linear')
     
-    #p3_df = pd.DataFrame()
+    #fit magnetization decay for all experiments
+    r1=np.zeros(nr_experiments)
     for i in range(nr_experiments):
         try:
             par=polymer.getparameter(i)
             fid=polymer.getfid(i)
-            tau = get_x_axis(polymer.getparameter(i), polymer.getparameter(i)['NBLK'])
+            tau = get_x_axis(polymer.getparameter(i))
             startpoint=int(0.05*polymer.getparameter(i)['BS'])
             endpoint=int(0.1*polymer.getparameter(i)['BS']) #TODO: make a range slider to get start- and endpoint interactively
             phi = get_mag_amplitude(fid, startpoint, endpoint,
@@ -271,39 +222,27 @@ def modify_doc(doc):
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
             df['phi_normalized']=(df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
             polymer.addparameter(i,'df_magnetization',df)
-            
-            fit_option = 2
-            if fit_option ==1:
-                from utils import fit_exp_linear
-                C0 = 0 # offset
-                popt = fit_exp_linear(df.tau, df.phi_normalized, C0)
-            elif fit_option == 2:
-                # needs prior knowledge for p0...        
-                p0=[1.0, 0.1**-1, 0.0]
-                popt, _ = leastsq(fun_exp_dec, p0  , args=(np.array(df.tau),np.array(df.phi_normalized)) )
-                #print(popt)
-                polymer.addparameter(i,'amp',popt[0])
-                polymer.addparameter(i,'r1',popt[1])
-                polymer.addparameter(i,'noise',popt[2])
-                tau = popt[1]*df.tau
-                phi = popt[0]**-1*(df.phi_normalized-popt[2])
-                p3_df=pd.DataFrame(data=np.c_[ tau, phi ], columns=['tau', 'phi'])
-                source_p3=ColumnDataSource(data=ColumnDataSource.from_df(p3_df))
-                p3.line('tau', 'phi', source=source_p3) #TODO add nice colors
+
+            p0 = [1, 2 * polymer.getparvalue(i,'T1MX'), 0]
+            df, popt = magnetization_fit(df,p0, fit_option=2)
+            polymer.addparameter(i,'amp',popt[0])
+            polymer.addparameter(i,'r1',popt[1])
+            polymer.addparameter(i,'noise',popt[2])
+            r1[i] = popt[1]
+
+            tau = popt[1]*df.tau
+            phi = popt[0]**-1*(df.phi_normalized - popt[2])
+            p3_df=pd.DataFrame(data=np.c_[ tau, phi ], columns=['tau', 'phi'])
+            source_p3=ColumnDataSource(data=ColumnDataSource.from_df(p3_df))
+            p3.line('tau', 'phi', source=source_p3) #TODO add nice colors
         except KeyError:
             print('no relaxation experiment found')
 
-        
-
-
-    doc.add_root(column(slider, p1, p2))
+    par_df['r1']=r1
+    doc.add_root(column(slider, p1, p2, p3))
     doc.add_root(layout_p4)
     doc.add_root(source) # i need to add the source for some reason...
 
-##    source_p3.data=ColumnDataSource.from_df(p3_df)
-##    p3.line(source=source_p3, line_width=5, alpha=0.6, hover_color='white', hover_alpha=0.5)
-
-    
 
 bokeh_app = Application(FunctionHandler(modify_doc))
 
