@@ -6,11 +6,12 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 import re
+import matplotlib as mpl #for the colormaps
 from bokeh.charts import Scatter, output_file, show
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.io import output_file, show
 from bokeh.plotting import figure
-from bokeh.palettes import Spectral5
+from bokeh.palettes import Spectral5, viridis
 from bokeh.layouts import widgetbox
 from bokeh.models.widgets import Dropdown, Select
 from bokeh.models.callbacks import CustomJS
@@ -18,7 +19,7 @@ from tornado.ioloop import IOLoop
 from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, Slider
+from bokeh.models import ColumnDataSource, Slider, RangeSlider
 from bokeh.server.server import Server
 import stelardatafile as sdf
 from utils import get_x_axis, model_exp_dec, fun_exp_dec, get_mag_amplitude, magnetization_fit
@@ -50,6 +51,8 @@ io_loop = IOLoop.current()
 #initially set experiment number ie=1
 ie = 1
 
+#TODO: work with more than one tab in the browser: file input, multiple data analysis and manipulation tabs, file output and recent results tab
+#TODO: clean modify_doc, it is awfully crowded here...
 def modify_doc(doc):
     fid=polymer.getfid(ie) #dataframe
     # TODO: more testing on get_x_axis
@@ -164,6 +167,13 @@ def modify_doc(doc):
             df, popt = magnetization_fit(df, p0, fit_option)
             source_df.data = ColumnDataSource.from_df(df)
             polymer.addparameter(ie,'popt(mono_exp)',popt)
+            fid_slider = RangeSlider(start=1,end=polymer.getparvalue(ie,'BS')+1,step=1,callback_policy='mouseup')
+            fid_range = ColumnDataSource(data=dict(value=[])) #dict(range())??
+            fid_range.on_change('data',cb)#do i have to put 'range'
+            fid_slider.callback=CustomJS(args=dict(source=fid_range),code="""
+                source.data = { value: [cb_obj.value] }
+            """)#unfortunately this customjs is needed to throttle the callback in current version of bokeh
+
         except KeyError:
             print('no relaxation experiment found')
             tau=np.zeros(nblk)
@@ -210,6 +220,8 @@ def modify_doc(doc):
     
     #fit magnetization decay for all experiments
     r1=np.zeros(nr_experiments)
+    MANY_COLORS = 0
+    p3_line_glyph=[]
     for i in range(nr_experiments):
         try:
             par=polymer.getparameter(i)
@@ -234,10 +246,14 @@ def modify_doc(doc):
             phi = popt[0]**-1*(df.phi_normalized - popt[2])
             p3_df=pd.DataFrame(data=np.c_[ tau, phi ], columns=['tau', 'phi'])
             source_p3=ColumnDataSource(data=ColumnDataSource.from_df(p3_df))
-            p3.line('tau', 'phi', source=source_p3) #TODO add nice colors
+            p3_line_glyph.append(p3.line('tau', 'phi', source=source_p3)) #TODO add nice colors
+            MANY_COLORS+=1
         except KeyError:
             print('no relaxation experiment found')
-
+    COLORS=viridis(MANY_COLORS)
+    
+    for ic in range(MANY_COLORS):
+        p3_line_glyph[ic].glyph.line_color=COLORS[ic]
     par_df['r1']=r1
     doc.add_root(column(slider, p1, p2, p3))
     doc.add_root(layout_p4)
