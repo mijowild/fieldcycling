@@ -90,6 +90,7 @@ def modify_doc(doc):
     p1.line('index', 'real', source=source_fid, color='green')
     p1.line('index', 'magnitude', source=source_fid, color='red')
 
+    fid_slider = RangeSlider(start=1,end=polymer.getparvalue(ie,'BS'),step=1,callback_policy='mouseup')
 
     p2 = figure(plot_width=300, plot_height=300,
                 title='Magnetization Decay')
@@ -148,14 +149,18 @@ def modify_doc(doc):
         layout_p4.children[1] = plot_par()
 
     def cb(attr, old, new):
-        ie = source.data['value'][0]
+        ie = source.data['value']
         fid = polymer.getfid(ie)
         source_fid.data = ColumnDataSource.from_df(fid)
         
         try:
             tau = get_x_axis(polymer.getparameter)
-            startpoint=int(0.05*polymer.getparvalue(ie,'BS'))
-            endpoint=int(0.1*polymer.getparvalue(ie,'BS'))
+            try:
+                startpoint=polymer.getparvalue(ie,'fid_amp_start')
+                endpoint=polymer.getparvalue(ie,'fid_amp_stop')
+            except:
+                startpoint=int(0.05*polymer.getparvalue(ie,'BS'))
+                endpoint=int(0.1*polymer.getparvalue(ie,'BS'))
             phi = get_mag_amplitude(fid, startpoint, endpoint,
                                     polymer.getparvalue(ie,'NBLK'),
                                     polymer.getparvalue(ie,'BS'))
@@ -167,12 +172,7 @@ def modify_doc(doc):
             df, popt = magnetization_fit(df, p0, fit_option)
             source_df.data = ColumnDataSource.from_df(df)
             polymer.addparameter(ie,'popt(mono_exp)',popt)
-            fid_slider = RangeSlider(start=1,end=polymer.getparvalue(ie,'BS')+1,step=1,callback_policy='mouseup')
-            fid_range = ColumnDataSource(data=dict(value=[])) #dict(range())??
-            fid_range.on_change('data',cb)#do i have to put 'range'
-            fid_slider.callback=CustomJS(args=dict(source=fid_range),code="""
-                source.data = { value: [cb_obj.value] }
-            """)#unfortunately this customjs is needed to throttle the callback in current version of bokeh
+            fid_slider = RangeSlider(start=1,end=polymer.getparvalue(ie,'BS'),range=(startpoint,endpoint),step=1,callback_policy='mouseup')
 
         except KeyError:
             print('no relaxation experiment found')
@@ -182,18 +182,52 @@ def modify_doc(doc):
             df['phi_normalized'] = np.zeros(nblk)
             df['fit_phi'] = np.zeros(nblk)
             source_df.data = ColumnDataSource.from_df(df)
+    def calculate_mag_dec(attr,old,new):
+        #ie=source.data['value']
+        #print(ie)
+        polymer.addparameter(ie,'fid_range',source2.data['range'])
+        print(polymer.getparvalue(ie,'fid_range')) #this works
+        start = source2.data['range'][0]
+        stop = source2.data['range'][1]
+        phi = get_mag_amplitude(fid, start, stop,
+                                    polymer.getparvalue(ie,'NBLK'),
+                                    polymer.getparvalue(ie,'BS'))
+        tau = polymer.getparvalue(ie,'df_magnetization').tau
+        df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
+        print(df) #this doesnt
+        df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+        print(df)
+        polymer.addparameter(ie,'df_magnetization',df)
+        fit_option = 2 #mono exponential, 3 parameter fit
+        p0=[1.0, polymer.getparvalue(ie,'T1MX')**-1*2, 0]
+        df, popt = magnetization_fit(df, p0, fit_option)
+        print(df)
+        source_df.data = ColumnDataSource.from_df(df)
+        polymer.addparameter(ie,'popt(mono_exp)',popt)
         
+        
+        print(start)
+        
+        print(attr)
+        print(old)
+        print(new)
+        pass
     #this source is only used to communicate to the actual callback (cb)
     source = ColumnDataSource(data=dict(value=[]))
     source.on_change('data',cb)
     
     slider = Slider(start=1, end=nr_experiments, value=1, step=1,callback_policy='mouseup')
     slider.callback=CustomJS(args=dict(source=source),code="""
-        source.data = { value: [cb_obj.value] }
+        source.data = { value: cb_obj.value }
     """)#unfortunately this customjs is needed to throttle the callback in current version of bokeh
 
+    source2=ColumnDataSource(data=dict(range=[]))
+    source2.on_change('data',calculate_mag_dec)
+    fid_slider.callback=CustomJS(args=dict(source=source2),code="""
+        source.data = { range: cb_obj.range }
+    """)#unfortunately this customjs is needed to throttle the callback in current version of bokeh
     
-    # add select boxes for p4
+    # select boxes for p4
     x = Select(title='X-Axis', value='ZONE', options=columns)
     x.on_change('value', update)
 
@@ -206,12 +240,9 @@ def modify_doc(doc):
     color = Select(title='Color', value='None', options=['None'] + quantileable)
     color.on_change('value', update)
 
-
     controls_p4 = widgetbox([x,y,color,size], width=150)
     layout_p4 = row(controls_p4,plot_par())
 
-    
-    
     #fitting on all experiments
     p3 = figure(plot_width=300, plot_height=300,
             title='normalized phi vs normalized tau', webgl = True,
@@ -241,7 +272,6 @@ def modify_doc(doc):
             polymer.addparameter(i,'r1',popt[1])
             polymer.addparameter(i,'noise',popt[2])
             r1[i] = popt[1]
-
             tau = popt[1]*df.tau
             phi = popt[0]**-1*(df.phi_normalized - popt[2])
             p3_df=pd.DataFrame(data=np.c_[ tau, phi ], columns=['tau', 'phi'])
@@ -251,13 +281,13 @@ def modify_doc(doc):
         except KeyError:
             print('no relaxation experiment found')
     COLORS=viridis(MANY_COLORS)
-    
     for ic in range(MANY_COLORS):
         p3_line_glyph[ic].glyph.line_color=COLORS[ic]
     par_df['r1']=r1
-    doc.add_root(column(slider, p1, p2, p3))
+    doc.add_root(column(slider, p1,fid_slider, p2, p3))
     doc.add_root(layout_p4)
     doc.add_root(source) # i need to add the source for some reason...
+    doc.add_root(source2)
 
 
 bokeh_app = Application(FunctionHandler(modify_doc))
@@ -270,4 +300,3 @@ if __name__ == '__main__':
 
     io_loop.add_callback(server.show, "/")
 io_loop.start()
-
