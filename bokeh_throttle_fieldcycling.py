@@ -183,6 +183,7 @@ def modify_doc(doc):
             #print(df)
             print(polymer.getparvalue(ie,'df_magnetization'))
             fid_slider = RangeSlider(start=1,end=polymer.getparvalue(ie,'BS'),range=(startpoint,endpoint),step=1,callback_policy='mouseup')
+            layout_p1.children[2]=fid_slider
 
         except KeyError:
             print('no relaxation experiment found')
