@@ -55,6 +55,7 @@ ie = 1
 #TODO: clean modify_doc, it is awfully crowded here...
 def modify_doc(doc):
     fid=polymer.getfid(ie) #dataframe
+
     # TODO: more testing on get_x_axis
     tau = get_x_axis(polymer.getparameter(ie))
 
@@ -75,6 +76,7 @@ def modify_doc(doc):
     fit_option = 2
     p0 = [1 , 2 * polymer.getparvalue(ie,'T1MX')**-1, 0]
     df, popt = magnetization_fit(df, p0, fit_option)
+    polymer.addparameter(ie,'popt(mono_exp)',popt)
     
     df['fit_phi'] = model_exp_dec(df.tau, *popt)
     
@@ -118,7 +120,6 @@ def modify_doc(doc):
         if x.value in time:
             kw['x_axis_type'] = 'datetime'
         
-            
         kw['title']="%s vs %s" % (x_title, y_title)
 
 
@@ -149,18 +150,22 @@ def modify_doc(doc):
         layout_p4.children[1] = plot_par()
 
     def cb(attr, old, new):
-        ie = source.data['value']
+        ## load experiment ie in plot p1 and p2
+        ie = new['value'][0]
         fid = polymer.getfid(ie)
-        source_fid.data = ColumnDataSource.from_df(fid)
-        
+        #print(fid)
+        #source_fid = ColumnDataSource.from_df(data=fid)
+        source_fid.data=ColumnDataSource.from_df(fid)
+        #print(source_fid)
         try:
-            tau = get_x_axis(polymer.getparameter)
+            tau = get_x_axis(polymer.getparameter(ie))
+            #print(tau)
             try:
                 startpoint=polymer.getparvalue(ie,'fid_amp_start')
                 endpoint=polymer.getparvalue(ie,'fid_amp_stop')
             except:
                 startpoint=int(0.05*polymer.getparvalue(ie,'BS'))
-                endpoint=int(0.1*polymer.getparvalue(ie,'BS'))
+                endpoint = int(0.1*polymer.getparvalue(ie,'BS'))
             phi = get_mag_amplitude(fid, startpoint, endpoint,
                                     polymer.getparvalue(ie,'NBLK'),
                                     polymer.getparvalue(ie,'BS'))
@@ -171,57 +176,57 @@ def modify_doc(doc):
             p0=[1.0, polymer.getparvalue(ie,'T1MX')**-1*2, 0]
             df, popt = magnetization_fit(df, p0, fit_option)
             source_df.data = ColumnDataSource.from_df(df)
+            
             polymer.addparameter(ie,'popt(mono_exp)',popt)
+            print(popt)
+
+            #print(df)
+            print(polymer.getparvalue(ie,'df_magnetization'))
             fid_slider = RangeSlider(start=1,end=polymer.getparvalue(ie,'BS'),range=(startpoint,endpoint),step=1,callback_policy='mouseup')
 
         except KeyError:
             print('no relaxation experiment found')
-            tau=np.zeros(nblk)
-            phi=np.zeros(nblk)
+            tau=np.zeros(1)
+            phi=np.zeros(1)
             df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
-            df['phi_normalized'] = np.zeros(nblk)
-            df['fit_phi'] = np.zeros(nblk)
+            df['phi_normalized'] = np.zeros(1)
+            df['fit_phi'] = np.zeros(1)
             source_df.data = ColumnDataSource.from_df(df)
-    def calculate_mag_dec(attr,old,new):
-        #ie=source.data['value']
-        #print(ie)
-        polymer.addparameter(ie,'fid_range',source2.data['range'])
-        print(polymer.getparvalue(ie,'fid_range')) #this works
-        start = source2.data['range'][0]
-        stop = source2.data['range'][1]
-        phi = get_mag_amplitude(fid, start, stop,
-                                    polymer.getparvalue(ie,'NBLK'),
-                                    polymer.getparvalue(ie,'BS'))
-        tau = polymer.getparvalue(ie,'df_magnetization').tau
-        df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
-        print(df) #this doesnt
-        df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
-        print(df)
-        polymer.addparameter(ie,'df_magnetization',df)
-        fit_option = 2 #mono exponential, 3 parameter fit
-        p0=[1.0, polymer.getparvalue(ie,'T1MX')**-1*2, 0]
-        df, popt = magnetization_fit(df, p0, fit_option)
-        print(df)
-        source_df.data = ColumnDataSource.from_df(df)
-        polymer.addparameter(ie,'popt(mono_exp)',popt)
-        
-        
-        print(start)
-        
-        print(attr)
-        print(old)
-        print(new)
-        pass
+
+    
     #this source is only used to communicate to the actual callback (cb)
     source = ColumnDataSource(data=dict(value=[]))
     source.on_change('data',cb)
     
     slider = Slider(start=1, end=nr_experiments, value=1, step=1,callback_policy='mouseup')
     slider.callback=CustomJS(args=dict(source=source),code="""
-        source.data = { value: cb_obj.value }
+        source.data = { value: [cb_obj.value] }
     """)#unfortunately this customjs is needed to throttle the callback in current version of bokeh
 
-    source2=ColumnDataSource(data=dict(range=[]))
+    def calculate_mag_dec(attr,old,new):
+        ie=slider.value
+        polymer.addparameter(ie,'fid_range',new['range'])
+        print(polymer.getparvalue(ie,'fid_range')) #this works
+        start = new['range'][0]
+        stop = new['range'][1]
+        fid=polymer.getfid(ie)
+        tau = polymer.getparvalue(ie,'df_magnetization').tau
+        phi = get_mag_amplitude(fid, start, stop,
+                                    polymer.getparvalue(ie,'NBLK'),
+                                    polymer.getparvalue(ie,'BS'))
+
+        df = pd.DataFrame(data=np.c_[tau, phi], columns=['tau', 'phi'])
+        df['phi_normalized'] = (df['phi'] - df['phi'].iloc[0] ) / (df['phi'].iloc[-1] - df['phi'].iloc[1] )
+
+        fit_option = 2 #mono exponential, 3 parameter fit
+        p0=polymer.getparvalue(ie,'popt(mono_exp)')
+        df, popt = magnetization_fit(df, p0, fit_option)
+        source_df.data = ColumnDataSource.from_df(df)
+        polymer.addparameter(ie,'df_magnetization',df)
+        polymer.addparameter(ie,'popt(mono_exp)',popt)
+        pass
+    
+    source2 = ColumnDataSource(data=dict(range=[], ie=[]))
     source2.on_change('data',calculate_mag_dec)
     fid_slider.callback=CustomJS(args=dict(source=source2),code="""
         source.data = { range: cb_obj.range }
@@ -257,7 +262,7 @@ def modify_doc(doc):
         try:
             par=polymer.getparameter(i)
             fid=polymer.getfid(i)
-            tau = get_x_axis(polymer.getparameter(i))
+            tau= get_x_axis(polymer.getparameter(i))
             startpoint=int(0.05*polymer.getparameter(i)['BS'])
             endpoint=int(0.1*polymer.getparameter(i)['BS']) #TODO: make a range slider to get start- and endpoint interactively
             phi = get_mag_amplitude(fid, startpoint, endpoint,
@@ -284,9 +289,10 @@ def modify_doc(doc):
     for ic in range(MANY_COLORS):
         p3_line_glyph[ic].glyph.line_color=COLORS[ic]
     par_df['r1']=r1
-    doc.add_root(column(slider, p1,fid_slider, p2, p3))
+    layout_p1 = column(slider, p1,fid_slider, p2, p3)
+    doc.add_root(layout_p1)
     doc.add_root(layout_p4)
-    doc.add_root(source) # i need to add the source for some reason...
+    doc.add_root(source) # i need to add source to detect changes
     doc.add_root(source2)
 
 
